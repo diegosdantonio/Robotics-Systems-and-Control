@@ -15,6 +15,7 @@
 #   - Be mindful of axis choice and link offsets; simplify first, refine later.
 #   - Compare both position and orientation errors.
 # ============================================================
+from audioop import error
 
 import mujoco
 import mujoco.viewer
@@ -43,9 +44,27 @@ def set_target_values(u):
     data.ctrl[act_ids["forward"]] = u[0]
     data.ctrl[act_ids["turn"]] = u[1]
 
-# ------------------------------------------------------------
-# Forward Kinematics Function
-# ------------------------------------------------------------
+##
+##
+##
+
+def wrap_pi(a):
+    return (a + np.pi) % (2*np.pi) - np.pi
+
+
+
+def controller(x, xd):
+    kp1 = 1.
+    kp2 = 0.1
+
+    e  =  np.linalg.norm(xd - x)
+    e_theta = wrap_pi(np.arctan2(xd[1] - x[1], xd[0] - x[0]) - x[2])
+
+    print(e)
+
+    u = np.array([kp1*e,
+                  kp2*e_theta])  # Example constant disturbance
+    return u
 
 
 # ============================================================
@@ -64,12 +83,21 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
         t = time.time() - t_start
         print("TIME:", t)
 
+
+
+        body_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, "car")
+        x = data.xpos[body_id]
+
+        # controller
+
+        x_des = np.array([1, 1, 0.0])
+        u = controller(x, x_des)
+
         # Update joint targets
 
-        u = np.array([1 , 0.1])
         set_target_values(u)
 
-
+        print(x)
         # Advance simulation
         mujoco.mj_step(model, data)
         viewer.sync()
